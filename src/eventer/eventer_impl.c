@@ -278,6 +278,7 @@ static void *thrloopwrap(void *vid) {
   int id = (int)(vpsized_int)vid;
   t = &eventer_impl_tls_data[id];
   t->id = id;
+  mtev_watchdog_register();
   mtev_memory_init_thread();
   eventer_per_thread_init(t);
   return (void *)(vpsized_int)__eventer->loop(id);

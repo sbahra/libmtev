@@ -34,6 +34,7 @@
 #include "mtev_defines.h"
 #include "mtev_memory.h"
 #include "mtev_log.h"
+#include "mtev_watchdog.h"
 #include "mtev_atomic.h"
 #include "eventer/eventer.h"
 #include "libmtev_dtrace_probes.h"
@@ -166,6 +167,7 @@ eventer_jobq_retrieve(const char *name) {
 
 static void *
 eventer_jobq_consumer_pthreadentry(void *vp) {
+  mtev_watchdog_register();
   mtev_memory_init_thread();
   return eventer_jobq_consumer((eventer_jobq_t *)vp);
 }

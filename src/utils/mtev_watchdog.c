@@ -72,11 +72,38 @@ static int span = 60;
 static int allow_async_dumps = 1;
 static int _global_stack_trace_fd = -1;
 static mtev_atomic32_t on_crash_fds_to_close[MAX_CRASH_FDS];
+static size_t mtev_altstack_size;
 
 typedef enum {
   GLIDE_CRASH,
   GLIDE_WATCHDOG
 } glide_reason_t;
+
+int mtev_watchdog_register(void) {
+  stack_t altstack;
+  int r = 0;
+
+  if (mtev_altstack_size == 0)
+    return 0;
+
+  altstack.ss_sp = malloc(mtev_altstack_size);
+  if(altstack.ss_sp == NULL) {
+    r = -1;
+  } else {
+    altstack.ss_size = mtev_altstack_size;
+    altstack.ss_flags = 0;
+    if(sigaltstack(&altstack,0) < 0) {
+      r = -1;
+    }
+  }
+
+  if(r == -1) {
+    mtevL(mtev_notice, "sigaltstack not used.\n");
+    return -1;
+  }
+
+  return 0;
+}
 
 int mtev_watchdog_glider(const char *path) {
   glider_path = path;
@@ -424,30 +451,22 @@ int mtev_watchdog_start_child(const char *app, int (*func)(),
       /* trace handlers */
       char *envcp;
       struct sigaction sa;
-      stack_t altstack;
-      size_t altstack_size, default_altstack_size = 32768;
+      const size_t mtev_default_altstack_size = 32768;
       mtev_monitored_child_pid = getpid();
       if(glider_path)
         mtevL(mtev_error, "catching faults with glider\n");
       else if(allow_async_dumps)
         mtevL(mtev_error, "no glider, allowing a single emancipated minor\n");
 
+      /* Extract default stack size settings. If 0, then unused. */
       if(NULL != (envcp = getenv("MTEV_ALTSTACK_SIZE"))) {
-        altstack_size = default_altstack_size = atoi(envcp);
+        mtev_altstack_size = atoi(envcp);
       }
-      if(default_altstack_size > 0) {
-        altstack_size = MAX(MINSIGSTKSZ, default_altstack_size);
-        if((altstack.ss_sp = malloc(altstack_size)) == NULL)
-          altstack_size = 0;
-        else {
-          altstack.ss_size = altstack_size;
-          altstack.ss_flags = 0;
-          if(sigaltstack(&altstack,0) < 0)
-            altstack_size = 0;
-        }
-      }
-      if(altstack_size == 0)
-        mtevL(mtev_notice, "sigaltstack not used.\n");
+
+      if(mtev_altstack_size > 0)
+        mtev_altstack_size = MAX(MINSIGSTKSZ, mtev_default_altstack_size);
+
+      mtev_watchdog_register();
 
       memset(&sa, 0, sizeof(sa));
       sa.sa_sigaction = emancipate;
