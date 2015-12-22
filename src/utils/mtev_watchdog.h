@@ -117,4 +117,10 @@ API_EXPORT(void)
 API_EXPORT(void)
   mtev_watchdog_on_crash_close_remove_fd(int fd);
 
+/* \fn void mtev_watchdog_register(void)
+   \brief registers the calling thread for signal and watchdog events
+ */
+API_EXORT(void)
+  mtev_watchdog_register(void);
+
 #endif
